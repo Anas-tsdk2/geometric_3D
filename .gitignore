@@ -1,0 +1,40 @@
+# Visual Studio / MSBuild
+.vs/
+ipch/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+*.obj
+*.o
+*.idb
+*.pdb
+*.ilk
+*.tlog
+*.lastbuildstate
+*.unsuccessfulbuild
+*.Build.CppClean.log
+*.exe.recipe
+*.VC.db
+*.VC.opendb
+
+# Solution/user-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Rider / JetBrains
+.idea/
+.claude/
+
+# Temporary logs created during local troubleshooting
+debug_run_out.log
+debug_run_err.log
+
+# CMake
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
