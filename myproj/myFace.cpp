@@ -17,5 +17,15 @@ myFace::~myFace(void)
 
 void myFace::computeNormal()
 {
-/**** TODO ****/
+	if (adjacent_halfedge == NULL) return;
+	
+	myPoint3D *p1 = adjacent_halfedge->source->point;
+	myPoint3D *p2 = adjacent_halfedge->next->source->point;
+	myPoint3D *p3 = adjacent_halfedge->next->next->source->point;
+
+	myVector3D v1 = *p2 - *p1;
+	myVector3D v2 = *p3 - *p1;
+	
+	normal->crossproduct(v1, v2);
+	normal->normalize();
 }
