@@ -610,13 +610,22 @@ void display()
 			if ((*it)->twin == NULL) continue;
 			myVertex *v2 = (*it)->twin->source;
 
-			if ( 0 /*ADD THE CONDITION TO CHECK IF THE HALFEDGE DEFINED BY (V1, V2) IS A SILHOUETTE EDGE*/ )
+			myFace *f1 = (*it)->adjacent_face;
+			myFace *f2 = (*it)->twin->adjacent_face;
+			
+			if (f1 != NULL && f2 != NULL && f1->normal != NULL && f2->normal != NULL)
 			{
-				append_overlay_vertex(silhouette_vertices, v1->point);
-				append_overlay_vertex(silhouette_vertices, v2->point);
-			}				
+				double dot1 = *(f1->normal) * camera_forward;
+				double dot2 = *(f2->normal) * camera_forward;
+
+				if ( dot1 * dot2 <= 0.0 /*ADD THE CONDITION TO CHECK IF THE HALFEDGE DEFINED BY (V1, V2) IS A SILHOUETTE EDGE*/ )
+				{
+					append_overlay_vertex(silhouette_vertices, v1->point);
+					append_overlay_vertex(silhouette_vertices, v2->point);
+				}				
+			}
 		}
-		draw_overlay_geometry(GL_LINES, silhouette_vertices, { 1.0f, 0.0f, 0.0f, 1.0f }, 4.0f);
+		draw_overlay_geometry(GL_LINES, silhouette_vertices, { 0.0f, 0.0f, 0.0f, 1.0f }, 4.0f);
  	}
 
 	if (drawnormals && vaos[VAO_NORMALS])
@@ -684,7 +693,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile(resolve_resource_path("hand.obj"))) {
+	if (m->readFile(resolve_resource_path("cube.obj"))) {
 		m->computeNormals();
 		makeBuffers(m);
 	}
