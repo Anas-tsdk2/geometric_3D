@@ -693,7 +693,7 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile(resolve_resource_path("cube.obj"))) {
+	if (m->readFile(resolve_resource_path("concave_holes.obj"))) {
 		m->computeNormals();
 		makeBuffers(m);
 	}

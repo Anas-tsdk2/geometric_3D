@@ -229,13 +229,62 @@ void myMesh::subdivisionCatmullClark()
 
 void myMesh::triangulate()
 {
-	/**** TODO ****/
+	for (size_t i = 0; i < faces.size(); i++)
+	{
+		triangulate(faces[i]);
+	}
 }
 
 //return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace *f)
 {
-	/**** TODO ****/
-	return false;
+	if (f == NULL || f->adjacent_halfedge == NULL) return false;
+
+	myHalfedge *e0 = f->adjacent_halfedge;
+	myHalfedge *e1 = e0->next;
+	myHalfedge *e2 = e1->next;
+
+	// Si c'est déjà un triangle, on s'arrête (3 côtés)
+	if (e2->next == e0) return false;
+
+	// Récupérer la dernière arête du polygone
+	myHalfedge *e_last = e0->prev;
+
+	// Création des nouveaux éléments pour couper le polygone
+	myHalfedge *h1 = new myHalfedge(); // de v2 vers v0
+	myHalfedge *h2 = new myHalfedge(); // de v0 vers v2
+	myFace *f_new = new myFace();
+
+	h1->source = e2->source; // sommet v2
+	h2->source = e0->source; // sommet v0
+
+	h1->twin = h2;
+	h2->twin = h1;
+
+	// Ajout aux listes globales
+	halfedges.push_back(h1);
+	halfedges.push_back(h2);
+	faces.push_back(f_new);
+
+	// Formation du nouveau triangle f_new avec e0, e1 et h1
+	h1->next = e0; e0->prev = h1;
+	e1->next = h1; h1->prev = e1;
+	
+	e0->adjacent_face = f_new;
+	e1->adjacent_face = f_new;
+	h1->adjacent_face = f_new;
+	f_new->adjacent_halfedge = e0;
+
+	// Mise à jour du polygone restant (f) avec h2, e2, ..., e_last
+	h2->next = e2; e2->prev = h2;
+	e_last->next = h2; h2->prev = e_last;
+	
+	h2->adjacent_face = f;
+	f->adjacent_halfedge = h2;
+
+	// Appel récursif pour continuer à trianguler le reste du polygone
+	triangulate(f);
+
+	return true;
 }
 
