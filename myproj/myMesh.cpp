@@ -235,55 +235,131 @@ void myMesh::triangulate()
 	}
 }
 
-//return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace *f)
 {
 	if (f == NULL || f->adjacent_halfedge == NULL) return false;
 
-	myHalfedge *e0 = f->adjacent_halfedge;
-	myHalfedge *e1 = e0->next;
-	myHalfedge *e2 = e1->next;
+	vector<myHalfedge*> edges;
+	myHalfedge* curr = f->adjacent_halfedge;
+	do {
+		edges.push_back(curr);
+		curr = curr->next;
+	} while (curr != f->adjacent_halfedge && curr != NULL);
 
-	// Si c'est déjà un triangle, on s'arrête (3 côtés)
-	if (e2->next == e0) return false;
+	if (edges.size() <= 3) return false;
 
-	// Récupérer la dernière arête du polygone
-	myHalfedge *e_last = e0->prev;
+	// Calcul de la normale du polygone
+	myVector3D normal(0, 0, 0);
+	for (size_t i = 0; i < edges.size(); i++) {
+		myPoint3D* p1 = edges[i]->source->point;
+		myPoint3D* p2 = edges[(i + 1) % edges.size()]->source->point;
+		normal.dX += (p1->Y - p2->Y) * (p1->Z + p2->Z);
+		normal.dY += (p1->Z - p2->Z) * (p1->X + p2->X);
+		normal.dZ += (p1->X - p2->X) * (p1->Y + p2->Y);
+	}
+	normal.normalize();
 
-	// Création des nouveaux éléments pour couper le polygone
-	myHalfedge *h1 = new myHalfedge(); // de v2 vers v0
-	myHalfedge *h2 = new myHalfedge(); // de v0 vers v2
-	myFace *f_new = new myFace();
+	while (edges.size() > 3) {
+		bool earFound = false;
+		int n = edges.size();
 
-	h1->source = e2->source; // sommet v2
-	h2->source = e0->source; // sommet v0
+		for (int i = 0; i < n; i++) {
+			int prev = (i - 1 + n) % n;
+			int next = (i + 1) % n;
 
-	h1->twin = h2;
-	h2->twin = h1;
+			//[Vi-1;Vi; Vi+1] 
+			myPoint3D* Vi_minus_1 = edges[prev]->source->point;
+			myPoint3D* Vi         = edges[i]->source->point;
+			myPoint3D* Vi_plus_1  = edges[next]->source->point;
 
-	// Ajout aux listes globales
-	halfedges.push_back(h1);
-	halfedges.push_back(h2);
-	faces.push_back(f_new);
+			// if Vi is convexe : 
+			myVector3D u = *Vi - *Vi_minus_1;
+			myVector3D v = *Vi_plus_1 - *Vi;
+			if ((u.crossproduct(v) * normal) > 1e-5) {
 
-	// Formation du nouveau triangle f_new avec e0, e1 et h1
-	h1->next = e0; e0->prev = h1;
-	e1->next = h1; h1->prev = e1;
-	
-	e0->adjacent_face = f_new;
-	e1->adjacent_face = f_new;
-	h1->adjacent_face = f_new;
-	f_new->adjacent_halfedge = e0;
+				// if has no vertex inside : 
+				bool has_no_vertex_inside = true;
+				for (int j = 0; j < n; j++) {
+					if (j == prev || j == i || j == next) continue;
+					myPoint3D* p = edges[j]->source->point;
 
-	// Mise à jour du polygone restant (f) avec h2, e2, ..., e_last
-	h2->next = e2; e2->prev = h2;
-	e_last->next = h2; h2->prev = e_last;
-	
-	h2->adjacent_face = f;
-	f->adjacent_halfedge = h2;
+					myVector3D u1 = *Vi - *Vi_minus_1;
+					myVector3D v1 = *p - *Vi_minus_1;
+					myVector3D u2 = *Vi_plus_1 - *Vi;
+					myVector3D v2 = *p - *Vi;
+					myVector3D u3 = *Vi_minus_1 - *Vi_plus_1;
+					myVector3D v3 = *p - *Vi_plus_1;
 
-	// Appel récursif pour continuer à trianguler le reste du polygone
-	triangulate(f);
+					if ((u1.crossproduct(v1) * normal) >= -1e-5 &&
+						(u2.crossproduct(v2) * normal) >= -1e-5 &&
+						(u3.crossproduct(v3) * normal) >= -1e-5) {
+						has_no_vertex_inside = false;
+						break;
+					}
+				}
+
+				if (has_no_vertex_inside) {
+					// clip Vi+1 and Vi-1
+					myHalfedge* e_prev = edges[prev];
+					myHalfedge* e_curr = edges[i];
+
+					myHalfedge* diag_in = new myHalfedge();
+					myHalfedge* diag_out = new myHalfedge();
+					diag_in->twin = diag_out;
+					diag_out->twin = diag_in;
+
+					diag_in->source = edges[next]->source;
+					diag_out->source = edges[prev]->source;
+
+					halfedges.push_back(diag_in);
+					halfedges.push_back(diag_out);
+
+					myFace* newFace = new myFace();
+					faces.push_back(newFace);
+					newFace->adjacent_halfedge = e_prev;
+
+					e_prev->next = e_curr;   e_curr->prev = e_prev;
+					e_curr->next = diag_in;  diag_in->prev = e_curr;
+					diag_in->next = e_prev;  e_prev->prev = diag_in;
+
+					e_prev->adjacent_face = newFace;
+					e_curr->adjacent_face = newFace;
+					diag_in->adjacent_face = newFace;
+
+					diag_out->next = edges[next];
+					diag_out->prev = edges[(prev - 1 + n) % n];
+					edges[next]->prev = diag_out;
+					edges[(prev - 1 + n) % n]->next = diag_out;
+
+					diag_out->adjacent_face = f;
+					f->adjacent_halfedge = diag_out;
+
+					// remove Vi
+					edges[prev] = diag_out;
+					edges.erase(edges.begin() + i);
+
+					earFound = true;
+					break;
+				}
+			}
+		}
+
+		if (!earFound) {
+			cout << "Attention : Poly concavite bloquee." << endl;
+			break;
+		}
+	}
+
+	if (edges.size() == 3) {
+		edges[0]->next = edges[1]; edges[1]->prev = edges[0];
+		edges[1]->next = edges[2]; edges[2]->prev = edges[1];
+		edges[2]->next = edges[0]; edges[0]->prev = edges[2];
+
+		edges[0]->adjacent_face = f;
+		edges[1]->adjacent_face = f;
+		edges[2]->adjacent_face = f;
+		f->adjacent_halfedge = edges[0];
+	}
 
 	return true;
 }
