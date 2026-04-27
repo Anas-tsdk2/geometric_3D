@@ -157,6 +157,105 @@ bool myMesh::readFile(std::string filename)
 	return true;
 }
 
+void myMesh::generateSurfaceOfRevolution(std::vector<myPoint3D*> profile, int slices)
+{
+	clear();
+	if (profile.empty() || slices < 3) return;
+
+	int nbPts = profile.size();
+	
+	// etape 1: on cree tous les points en tournant autour de Y
+	double angle = 2.0 * 3.14159265 / slices;
+	myVector3D axeY(0.0, 1.0, 0.0);
+
+	for (int i = 0; i < slices; i++) {
+		for (int j = 0; j < nbPts; j++) {
+			myPoint3D* p = new myPoint3D(profile[j]->X, profile[j]->Y, profile[j]->Z);
+			p->rotate(axeY, i * angle); // on fait tourner le point
+			
+			myVertex* v = new myVertex();
+			v->point = p;
+			v->index = vertices.size(); // pas besoin de static_cast je pense
+			vertices.push_back(v);
+		}
+	}
+
+	// etape 2: on relie les points pour faire les faces (des quads)
+	map<pair<int, int>, myHalfedge*> twin_map; // pour gerer les twins
+
+	for (int i = 0; i < slices; i++) {
+		int next_i = (i + 1) % slices;
+		
+		for (int j = 0; j < nbPts - 1; j++) {
+			// on recupere les 4 coins du quad
+			int p1 = i * nbPts + j;
+			int p2 = next_i * nbPts + j;
+			int p3 = next_i * nbPts + (j + 1);
+			int p4 = i * nbPts + (j + 1);
+
+			myFace* f = new myFace();
+			faces.push_back(f);
+
+			// on fait les 4 demi aretes "a la main"
+			myHalfedge* h1 = new myHalfedge();
+			myHalfedge* h2 = new myHalfedge();
+			myHalfedge* h3 = new myHalfedge();
+			myHalfedge* h4 = new myHalfedge();
+
+			h1->source = vertices[p1];
+			h2->source = vertices[p2];
+			h3->source = vertices[p3];
+			h4->source = vertices[p4];
+
+			h1->adjacent_face = f;
+			h2->adjacent_face = f;
+			h3->adjacent_face = f;
+			h4->adjacent_face = f;
+
+			h1->index = halfedges.size(); halfedges.push_back(h1);
+			h2->index = halfedges.size(); halfedges.push_back(h2);
+			h3->index = halfedges.size(); halfedges.push_back(h3);
+			h4->index = halfedges.size(); halfedges.push_back(h4);
+
+			// lier le sommet a son arete si c'est pas fait
+			if (h1->source->originof == NULL) h1->source->originof = h1;
+			if (h2->source->originof == NULL) h2->source->originof = h2;
+			if (h3->source->originof == NULL) h3->source->originof = h3;
+			if (h4->source->originof == NULL) h4->source->originof = h4;
+
+			// next et prev
+			h1->next = h2; h1->prev = h4;
+			h2->next = h3; h2->prev = h1;
+			h3->next = h4; h3->prev = h2;
+			h4->next = h1; h4->prev = h3;
+
+			f->adjacent_halfedge = h1;
+
+			// gestion des twins
+			myHalfedge* tab_h[4] = {h1, h2, h3, h4};
+			int tab_id[4] = {p1, p2, p3, p4};
+
+			for(int k = 0; k < 4; k++) {
+				int de = tab_id[k];
+				int vers = tab_id[(k+1)%4];
+				
+				pair<int, int> envers(vers, de);
+				if (twin_map.count(envers)) {
+					// on a trouve le twin !
+					tab_h[k]->twin = twin_map[envers];
+					twin_map[envers]->twin = tab_h[k];
+					twin_map.erase(envers);
+				} else {
+					twin_map[pair<int, int>(de, vers)] = tab_h[k];
+				}
+			}
+		}
+	}
+
+	normalize(); // on centre tout
+	computeNormals();
+}
+
 
 void myMesh::computeNormals()
 {

@@ -517,6 +517,19 @@ void menu(int item)
 #endif
 			break;
 	    }
+	case MENU_GENERATE:
+		{
+			std::vector<myPoint3D*> profil;
+			
+			// Forme ultra-basique : Un Cylindre (2 points seulement)
+			profil.push_back(new myPoint3D(0.5, -1.0, 0.0)); // Bas
+			profil.push_back(new myPoint3D(0.5,  1.0, 0.0)); // Haut
+
+			// Génère 16 tranches
+			m->generateSurfaceOfRevolution(profil, 100); 
+			makeBuffers(m);
+			break;
+		}
 	case MENU_EXIT:
 		{
 			g_running = false;
