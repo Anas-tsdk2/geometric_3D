@@ -44,6 +44,88 @@ void myMesh::checkMesh()
 	else cout << "Each edge has a twin!\n";
 }
 
+void myMesh::verifyMesh()
+{
+	cout << "--- Debut des tests de la structure Half-Edge ---" << endl;
+	bool global_ok = true;
+
+	// 1. Verification des sommets
+	bool sommets_ok = true;
+	for (unsigned int i = 0; i < vertices.size(); i++) {
+		myVertex* v = vertices[i];
+		if (v->originof != NULL) {
+			// l'arete qui part de ce sommet doit bien avoir ce sommet comme depart
+			if (v->originof->source != v) {
+				cout << "Erreur : le sommet " << i << " a un pointeur originof faux !" << endl;
+				sommets_ok = false;
+				global_ok = false;
+			}
+		}
+	}
+	if (sommets_ok) cout << "-> Test des sommets : VALIDE" << endl;
+	else cout << "-> Test des sommets : ECHEC" << endl;
+
+	// 2. Verification des demi-aretes (les semi-aretes)
+	bool aretes_ok = true;
+	for (unsigned int i = 0; i < halfedges.size(); i++) {
+		myHalfedge* h = halfedges[i];
+		
+		// test du twin (le jumeau)
+		if (h->twin != NULL) {
+			if (h->twin->twin != h) {
+				cout << "Erreur : le twin de l'arete " << i << " ne pointe pas vers elle en retour !" << endl;
+				aretes_ok = false;
+				global_ok = false;
+			}
+		} else {
+			cout << "Erreur : l'arete " << i << " n'a pas de jumeau (twin null) !" << endl;
+			aretes_ok = false;
+			global_ok = false;
+		}
+
+		// test de la continuite (next et prev)
+		if (h->next != NULL && h->next->prev != h) {
+			cout << "Erreur : next->prev est casse pour l'arete " << i << endl;
+			aretes_ok = false;
+			global_ok = false;
+		}
+		if (h->prev != NULL && h->prev->next != h) {
+			cout << "Erreur : prev->next est casse pour l'arete " << i << endl;
+			aretes_ok = false;
+			global_ok = false;
+		}
+	}
+	if (aretes_ok) cout << "-> Test des demi-aretes : VALIDE" << endl;
+	else cout << "-> Test des demi-aretes : ECHEC" << endl;
+
+	// 3. Verification des faces
+	bool faces_ok = true;
+	for (unsigned int i = 0; i < faces.size(); i++) {
+		myFace* f = faces[i];
+		if (f->adjacent_halfedge != NULL) {
+			// on s'assure que l'arete de la face pointe bien sur nous
+			if (f->adjacent_halfedge->adjacent_face != f) {
+				cout << "Erreur : l'arete de la face " << i << " ne reconnait pas sa face !" << endl;
+				faces_ok = false;
+				global_ok = false;
+			}
+		} else {
+			cout << "Erreur : la face " << i << " est vide (pointeur null) !" << endl;
+			faces_ok = false;
+			global_ok = false;
+		}
+	}
+	if (faces_ok) cout << "-> Test des faces : VALIDE" << endl;
+	else cout << "-> Test des faces : ECHEC" << endl;
+
+	if (global_ok) {
+		cout << "Super, aucun probleme detecte dans tout le maillage !" << endl;
+	} else {
+		cout << "Attention : La structure est cassee quelque part..." << endl;
+	}
+	cout << "-------------------------------------------------" << endl;
+}
+
 
 bool myMesh::readFile(std::string filename)
 {

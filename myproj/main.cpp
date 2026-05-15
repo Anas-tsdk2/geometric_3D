@@ -394,6 +394,7 @@ void menu(int item)
 	case MENU_TRIANGULATE:
 		{
 			m->triangulate();
+			m->verifyMesh(); // on teste si la triangulation n'a rien casse
 			m->computeNormals();
 			makeBuffers(m);
 			break;
@@ -510,6 +511,7 @@ void menu(int item)
 				m->clear();
 				if (m->readFile(outPath.get()))
 				{
+					m->verifyMesh(); // on teste le fichier juste apres l'avoir charge
 					m->computeNormals();
 					makeBuffers(m);
 				}
@@ -521,12 +523,20 @@ void menu(int item)
 		{
 			std::vector<myPoint3D*> profil;
 			
-			// Forme ultra-basique : Un Cylindre (2 points seulement)
-			profil.push_back(new myPoint3D(0.5, -1.0, 0.0)); // Bas
-			profil.push_back(new myPoint3D(0.5,  1.0, 0.0)); // Haut
+			// Forme d'un vase
+			profil.push_back(new myPoint3D(0.2, -1.0, 0.0)); // base
+			profil.push_back(new myPoint3D(0.6, -0.6, 0.0)); // ventre 1
+			profil.push_back(new myPoint3D(0.7, -0.2, 0.0)); // ventre 2 (max)
+			profil.push_back(new myPoint3D(0.4,  0.3, 0.0)); // cou
+			profil.push_back(new myPoint3D(0.2,  0.7, 0.0)); // cou fin
+			profil.push_back(new myPoint3D(0.3,  1.0, 0.0)); // rebord haut
 
-			// Génère 16 tranches
-			m->generateSurfaceOfRevolution(profil, 100); 
+			// Genere 16 tranches
+			m->generateSurfaceOfRevolution(profil, 16); 
+			
+			// On verifie si le maillage cree est valide
+			m->verifyMesh();
+			
 			makeBuffers(m);
 			break;
 		}

@@ -14,6 +14,7 @@ public:
 	std::string name;
 
 	void checkMesh();
+	void verifyMesh(); // nouvelle fonction pour le TP
 	bool readFile(std::string filename);
 	void computeNormals();
 	void normalize();
