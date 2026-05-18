@@ -481,6 +481,14 @@ void menu(int item)
 			makeBuffers(m);
 			break;
 		}
+	case MENU_SIMPLIFY:
+		{
+			m->simplify();
+			m->verifyMesh(); // On verifie que la simplification n'a rien casse
+			m->computeNormals();
+			makeBuffers(m);
+			break;
+		}
 	case MENU_SPLITEDGE:
 		{
 			if (pickedpoint != NULL && closest_edge != NULL)	

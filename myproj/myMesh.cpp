@@ -407,6 +407,138 @@ void myMesh::subdivisionCatmullClark()
 	/**** TODO ****/
 }
 
+void myMesh::collapseEdge(myHalfedge* e)
+{
+	// On verifie que l'arete existe et qu'elle n'est pas au bord
+	if (e == NULL || e->twin == NULL) return; 
+	
+	myVertex* v1 = e->source;
+	myVertex* v2 = e->twin->source;
+
+	if (v1 == NULL || v2 == NULL) return;
+
+	// On bouge v1 pile au milieu des deux
+	v1->point->X = (v1->point->X + v2->point->X) / 2.0;
+	v1->point->Y = (v1->point->Y + v2->point->Y) / 2.0;
+	v1->point->Z = (v1->point->Z + v2->point->Z) / 2.0;
+
+	// Toutes les aretes qui partaient de v2 partent maintenant de v1
+	for (unsigned int i = 0; i < halfedges.size(); i++) {
+		if (halfedges[i]->source == v2) {
+			halfedges[i]->source = v1;
+		}
+	}
+
+	// On recupere les aretes autour (les 2 triangles qui vont disparaitre)
+	myHalfedge* e1 = e->next;
+	myHalfedge* e2 = e->prev;
+	myHalfedge* e3 = e->twin->next;
+	myHalfedge* e4 = e->twin->prev;
+
+	// On relie les faces exterieures entre elles pour boucher le trou
+	if (e1 != NULL && e2 != NULL && e1->twin != NULL && e2->twin != NULL) {
+		e1->twin->twin = e2->twin;
+		e2->twin->twin = e1->twin;
+	}
+
+	if (e3 != NULL && e4 != NULL && e3->twin != NULL && e4->twin != NULL) {
+		e3->twin->twin = e4->twin;
+		e4->twin->twin = e3->twin;
+	}
+
+	// On corrige les faces pour qu'elles ne pointent plus sur les aretes supprimees
+	if (e1 != NULL && e1->twin != NULL) e1->twin->adjacent_face->adjacent_halfedge = e1->twin;
+	if (e2 != NULL && e2->twin != NULL) e2->twin->adjacent_face->adjacent_halfedge = e2->twin;
+	if (e3 != NULL && e3->twin != NULL) e3->twin->adjacent_face->adjacent_halfedge = e3->twin;
+	if (e4 != NULL && e4->twin != NULL) e4->twin->adjacent_face->adjacent_halfedge = e4->twin;
+
+	// v1 doit pointer sur une arete valide
+	if (e2 != NULL && e2->twin != NULL) v1->originof = e2->twin;
+
+	// On s'assure que les autres sommets du triangle ne pointent pas sur les aretes qui disparaissent
+	if (e2 != NULL && e1 != NULL && e1->twin != NULL && e2->source->originof == e2) {
+		e2->source->originof = e1->twin;
+	}
+	if (e4 != NULL && e3 != NULL && e3->twin != NULL && e4->source->originof == e4) {
+		e4->source->originof = e3->twin;
+	}
+
+	// On supprime l'ancien point v2 de notre liste
+	for (unsigned int i = 0; i < vertices.size(); i++) {
+		if (vertices[i] == v2) {
+			vertices.erase(vertices.begin() + i);
+			break;
+		}
+	}
+
+	// On supprime les 2 faces ecrasees
+	myFace* f1 = e->adjacent_face;
+	myFace* f2 = e->twin->adjacent_face;
+	for (unsigned int i = 0; i < faces.size(); i++) {
+		if (faces[i] == f1 || faces[i] == f2) { 
+			faces.erase(faces.begin() + i); 
+			i--; 
+		}
+	}
+
+	// On supprime les 6 aretes internes qui ont disparu
+	myHalfedge* liste[6] = {e, e->twin, e1, e2, e3, e4};
+	for (int k = 0; k < 6; k++) {
+		if (liste[k] == NULL) continue;
+		for (unsigned int i = 0; i < halfedges.size(); i++) {
+			if (halfedges[i] == liste[k]) {
+				halfedges.erase(halfedges.begin() + i);
+				break;
+			}
+		}
+	}
+}
+
+void myMesh::simplify()
+{
+	cout << "Simplification en cours..." << endl;
+	
+	// La simplification suppose que ce sont des triangles. On s'en assure :
+	triangulate();
+	
+	// On enleve 10% du maillage
+	int limite = halfedges.size() * 0.1; 
+	
+	for (int k = 0; k < limite; k++) {
+		
+		double min_dist = 999999.0;
+		myHalfedge* arete_courte = NULL;
+
+		// On cherche l'arete la plus petite
+		for (unsigned int i = 0; i < halfedges.size(); i++) {
+			myHalfedge* h = halfedges[i];
+			if (h == NULL || h->twin == NULL) continue; // on passe les bords
+
+			// Calcul de la distance
+			double dx = h->source->point->X - h->twin->source->point->X;
+			double dy = h->source->point->Y - h->twin->source->point->Y;
+			double dz = h->source->point->Z - h->twin->source->point->Z;
+			double dist = dx*dx + dy*dy + dz*dz;
+
+			if (dist < min_dist) {
+				min_dist = dist;
+				arete_courte = h;
+			}
+		}
+
+		// On ecrase la plus petite
+		if (arete_courte != NULL) {
+			collapseEdge(arete_courte);
+		}
+	}
+
+	// On recale les id pour OpenGL
+	for(unsigned int i = 0; i < vertices.size(); i++) vertices[i]->index = i;
+	for(unsigned int i = 0; i < halfedges.size(); i++) halfedges[i]->index = i;
+
+	cout << "C'est fini ! J'ai enleve " << limite << " aretes." << endl;
+}
+
 
 void myMesh::triangulate()
 {

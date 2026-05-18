@@ -29,6 +29,9 @@ public:
 	void triangulate();
 	bool triangulate(myFace *);
 
+	void simplify(); // pour le TP simplification
+	void collapseEdge(myHalfedge* e); // fonction utilitaire pour la simplification
+
 	void generateSurfaceOfRevolution(std::vector<myPoint3D*> profile, int slices);
 
 	void clear();
