@@ -14,7 +14,7 @@ public:
 	std::string name;
 
 	void checkMesh();
-	void verifyMesh(); // nouvelle fonction pour le TP
+	void verifyMesh(); 
 	bool readFile(std::string filename);
 	void computeNormals();
 	void normalize();
@@ -29,8 +29,8 @@ public:
 	void triangulate();
 	bool triangulate(myFace *);
 
-	void simplify(); // pour le TP simplification
-	void collapseEdge(myHalfedge* e); // fonction utilitaire pour la simplification
+	void simplify(); 
+	void collapseEdge(myHalfedge* e); 
 
 	void generateSurfaceOfRevolution(std::vector<myPoint3D*> profile, int slices);
 
