@@ -404,7 +404,195 @@ void myMesh::splitFaceQUADS(myFace *f, myPoint3D *p)
 
 void myMesh::subdivisionCatmullClark()
 {
-	/**** TODO ****/
+	cout << "Lancement de Catmull-Clark..." << endl;
+
+	if (faces.empty()) return;
+
+	// Calculer les points de face (Face Points) = moyenne des sommets de la face
+	map<myFace*, myPoint3D*> face_points;
+	for (unsigned int i = 0; i < faces.size(); i++) {
+		myFace* f = faces[i];
+		myPoint3D* fp = new myPoint3D(0, 0, 0);
+		int n = 0;
+		myHalfedge* e = f->adjacent_halfedge;
+		do {
+			*fp = *fp + *(e->source->point);
+			n++;
+			e = e->next;
+		} while (e != f->adjacent_halfedge);
+		*fp = *fp / n;
+		face_points[f] = fp;
+	}
+
+	// Calculer les points d'arete (Edge Points) = moyenne des 2 sommets et des 2 Face Points
+	map<pair<int, int>, myPoint3D*> edge_points;
+	for (unsigned int i = 0; i < halfedges.size(); i++) {
+		myHalfedge* e = halfedges[i];
+		if (e->twin == NULL) continue; // On ignore les bords ouverts
+
+		int id1 = e->source->index;
+		int id2 = e->twin->source->index;
+		pair<int, int> cle(min(id1, id2), max(id1, id2));
+
+		if (edge_points.find(cle) == edge_points.end()) {
+			myPoint3D* v1 = e->source->point;
+			myPoint3D* v2 = e->twin->source->point;
+			myPoint3D* fp1 = face_points[e->adjacent_face];
+			myPoint3D* fp2 = face_points[e->twin->adjacent_face];
+
+			myPoint3D* ep = new myPoint3D(0, 0, 0);
+			*ep = *v1 + *v2 + *fp1 + *fp2;
+			*ep = *ep / 4.0;
+			edge_points[cle] = ep;
+		}
+	}
+
+	// Calculer les nouveaux points de sommet (Vertex Points)
+	map<myVertex*, myPoint3D*> new_vertex_points;
+	for (unsigned int i = 0; i < vertices.size(); i++) {
+		myVertex* v = vertices[i];
+
+		myPoint3D F(0, 0, 0); 
+		myPoint3D R(0, 0, 0); 
+		int n = 0;
+
+		myHalfedge* e = v->originof;
+		bool on_boundary = false;
+		
+		if (e != NULL) {
+			do {
+				if (e->twin == NULL || e->twin->next == NULL) { 
+					on_boundary = true; 
+					break; 
+				}
+				F = F + *(face_points[e->adjacent_face]);
+				
+				myPoint3D milieu = *(e->source->point) + *(e->twin->source->point);
+				milieu = milieu / 2.0;
+				R = R + milieu;
+
+				n++;
+				e = e->twin->next; // On tourne autour du sommet
+			} while (e != v->originof && e != NULL);
+		} else {
+			on_boundary = true;
+		}
+
+		myPoint3D* vp = new myPoint3D(0,0,0);
+		if (on_boundary || n == 0) {
+			// On ne bouge pas les points situés au bord du trou
+			*vp = *(v->point);
+		} else {
+			F = F / n;
+			R = R / n;
+			myPoint3D point_v = *(v->point);
+			
+			// Formule officielle de Catmull Clark: (F + 2R + (n-3)*v) / n
+			*vp = F + (R * 2.0) + (point_v * (n - 3));
+			*vp = *vp / n;
+		}
+		new_vertex_points[v] = vp;
+	}
+
+	// On cree les nouveaux Quads (4 points par quad)
+	vector<vector<myPoint3D*>> nouveaux_quads;
+
+	for (unsigned int i = 0; i < faces.size(); i++) {
+		myFace* f = faces[i];
+		myPoint3D* fp = face_points[f];
+
+		myHalfedge* e = f->adjacent_halfedge;
+		do {
+			myVertex* v_courant = e->source;
+			myVertex* v_suivant = e->next->source;
+			myVertex* v_precedent = e->prev->source;
+
+			// Recuperer les Edge Points lies
+			int id_a = v_courant->index;
+			int id_b = v_suivant->index;
+			myPoint3D* ep_suivant = edge_points[make_pair(min(id_a, id_b), max(id_a, id_b))];
+
+			int id_c = v_precedent->index;
+			int id_d = v_courant->index;
+			myPoint3D* ep_precedent = edge_points[make_pair(min(id_c, id_d), max(id_c, id_d))];
+
+			myPoint3D* nv = new_vertex_points[v_courant];
+
+			// On ajoute le Quad si tout est valide
+			if (ep_suivant != NULL && ep_precedent != NULL && nv != NULL && fp != NULL) {
+				vector<myPoint3D*> quad;
+				quad.push_back(nv);
+				quad.push_back(ep_suivant);
+				quad.push_back(fp);
+				quad.push_back(ep_precedent);
+				nouveaux_quads.push_back(quad);
+			}
+
+			e = e->next;
+		} while (e != f->adjacent_halfedge);
+	}
+
+	// On reconstruit entierement le maillage
+	clear(); 
+
+	map<myPoint3D*, int> point_to_index;
+
+	for (unsigned int i = 0; i < nouveaux_quads.size(); i++) {
+		myFace* f = new myFace();
+		faces.push_back(f);
+
+		vector<myHalfedge*> face_halfedges(4, NULL);
+
+		for (int j = 0; j < 4; j++) {
+			myPoint3D* p = nouveaux_quads[i][j];
+
+			// Ajouter le sommet s'il n'existe pas
+			if (point_to_index.find(p) == point_to_index.end()) {
+				myVertex* v = new myVertex();
+				v->point = p;
+				v->index = vertices.size();
+				vertices.push_back(v);
+				point_to_index[p] = v->index;
+			}
+			
+			int v_idx = point_to_index[p];
+
+			myHalfedge* h = new myHalfedge();
+			h->source = vertices[v_idx];
+			h->adjacent_face = f;
+			h->index = halfedges.size();
+			halfedges.push_back(h);
+			face_halfedges[j] = h;
+
+			if (h->source->originof == NULL) h->source->originof = h;
+		}
+
+		// On lie le next et le prev de la nouvelle face
+		for (int j = 0; j < 4; j++) {
+			face_halfedges[j]->next = face_halfedges[(j + 1) % 4];
+			face_halfedges[j]->prev = face_halfedges[(j + 3) % 4];
+		}
+		f->adjacent_halfedge = face_halfedges[0];
+	}
+
+	// On lie les jumeaux grace a une map
+	map<pair<int, int>, myHalfedge*> twin_map;
+	for (unsigned int i = 0; i < halfedges.size(); i++) {
+		myHalfedge* h = halfedges[i];
+		int id1 = h->source->index;
+		int id2 = h->next->source->index;
+
+		pair<int, int> envers(id2, id1);
+		if (twin_map.count(envers)) {
+			h->twin = twin_map[envers];
+			twin_map[envers]->twin = h;
+			twin_map.erase(envers);
+		} else {
+			twin_map[make_pair(id1, id2)] = h;
+		}
+	}
+
+	cout << "Catmull-Clark termine ! Maillage affine avec succes." << endl;
 }
 
 void myMesh::collapseEdge(myHalfedge* e)

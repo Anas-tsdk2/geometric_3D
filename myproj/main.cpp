@@ -476,7 +476,8 @@ void menu(int item)
 	case MENU_CATMULLCLARK:
 		{
 			m->subdivisionCatmullClark();
-			clear();
+			clear(); 
+			m->verifyMesh(); // On verifie le nouveau maillage 
 			m->computeNormals();
 			makeBuffers(m);
 			break;
