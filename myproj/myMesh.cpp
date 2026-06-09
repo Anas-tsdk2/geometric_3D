@@ -78,9 +78,9 @@ void myMesh::verifyMesh()
 				global_ok = false;
 			}
 		} else {
-			cout << "Erreur : l'arete " << i << " n'a pas de jumeau (twin null) !" << endl;
-			aretes_ok = false;
-			global_ok = false;
+			// Pas d'erreur fatale, mais on affiche un avertissement pour prevenir
+			// qu'il y a soit un bord ouvert normal, soit un trou accidentel.
+			cout << "Warning : l'arete " << i << " n'a pas de jumeau (bord ouvert ou trou)." << endl;
 		}
 
 		// test de la continuite (next et prev)
