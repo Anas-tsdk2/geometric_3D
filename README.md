@@ -2,6 +2,10 @@
 
 Voici le compte-rendu détaillé des méthodes que j'ai implémentées au cours de ce projet.
 
+## 📝 Méthodologie et Utilisation de l'IA
+
+Tout au long de ce projet, j'ai adopté une méthode de travail itérative avec des commits réguliers après quasiment chaque séance de TD pour suivre ma progression.
+Pour coder les différents algorithmes, je me suis référé aux supports de cours. ET aussi, j'ai utilisé l'IA Gemini comme assistant pour clarifier certains concepts.
 
 ## Exercices et Méthodes implémentées
 
